@@ -204,7 +204,11 @@ class Processes (object):
 				self._terminate(process)
 				self._start(process)
 
-	def write (self,process,string):
+	def write (self,process,string,peer=None):
+		if peer:
+			self.increase(peer)
+
+		# XXX: FIXME: This is potentially blocking
 		while True:
 			try:
 				self._process[process].stdin.write('%s\n' % string)
@@ -242,44 +246,44 @@ class Processes (object):
 		for process in self._notify(peer,'*'):
 			data = self._api_encoder[process].reset(peer)
 			if data:
-				self.write(process,data)
+				self.write(process,data,peer)
 
 	def increase (self,peer):
 		if self.silence: return
 		for process in self._notify(peer,'*'):
 			data = self._api_encoder[process].increase(peer)
 			if data:
-				self.write(process,data)
+				self.write(process,data,peer)
 
 	def up (self,peer):
 		if self.silence: return
 		for process in self._notify(peer,'neighbor-changes'):
-			self.write(process,self._api_encoder[process].up(peer))
+			self.write(process,self._api_encoder[process].up(peer),peer)
 
 	def connected (self,peer):
 		if self.silence: return
 		for process in self._notify(peer,'neighbor-changes'):
-			self.write(process,self._api_encoder[process].connected(peer))
+			self.write(process,self._api_encoder[process].connected(peer),peer)
 
 	def down (self,peer,reason):
 		if self.silence: return
 		for process in self._notify(peer,'neighbor-changes'):
-			self.write(process,self._api_encoder[process].down(peer,reason))
+			self.write(self._api_encoder[process].down(peer,reason),peer,process)
 
 	def receive (self,peer,category,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'receive-packets'):
-			self.write(process,self._api_encoder[process].receive(peer,category,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].receive(peer,category)
 
 	def send (self,peer,category,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'send-packets'):
-			self.write(process,self._api_encoder[process].send(peer,category,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].send(peer,category)
 
 	def notification (self,peer,code,subcode,data):
 		if self.silence: return
 		for process in self._notify(peer,'neighbor-changes'):
-			self.write(process,self._api_encoder[process].notification(peer,code,subcode,data))
+			self.write(subcode,data),peer,process,self._api_encoder[process].notification(peer,code)
 
 	def message (self,message_id,peer,message,header,*body):
 		self._dispatch[message_id](self,peer,message,header,*body)
@@ -298,28 +302,28 @@ class Processes (object):
 	def _open (self,peer,open_msg,header,body,direction='received'):
 		if self.silence: return
 		for process in self._notify(peer,'receive-opens'):
-			self.write(process,self._api_encoder[process].open(peer,direction,open_msg,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].open(peer,direction,open_msg)
 
 	@register_process(Message.ID.KEEPALIVE,_dispatch)
 	def _keepalive (self,peer,category,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'receive-keepalives'):
-			self.write(process,self._api_encoder[process].keepalive(peer,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].keepalive(peer)
 
 	@register_process(Message.ID.UPDATE,_dispatch)
 	def _update (self,peer,update,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'receive-updates'):
-			self.write(process,self._api_encoder[process].update(peer,update,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].update(peer,update)
 
 	@register_process(Message.ID.ROUTE_REFRESH,_dispatch)
 	def _refresh (self,peer,refresh,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'receive-refresh'):
-			self.write(process,self._api_encoder[process].refresh(peer,refresh,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].refresh(peer,refresh)
 
 	@register_process(Message.ID.OPERATIONAL,_dispatch)
 	def _operational (self,peer,operational,header,body):
 		if self.silence: return
 		for process in self._notify(peer,'receive-operational'):
-			self.write(process,self._api_encoder[process].operational(peer,operational.category,operational,header,body))
+			self.write(header,body),peer,process,self._api_encoder[process].operational(peer,operational.category,operational)
